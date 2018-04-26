@@ -23,6 +23,7 @@ import sys
 from typing import List, Optional, Any, Set
 import yaml
 
+entity_model_only = False
 
 def resolve_ref(ref):
     return ref.split('/')[-1]
@@ -326,12 +327,15 @@ class Operation:
         references = [x.property.ref_type for x in self.responses if x.property.ref_type] + \
                      [x.property.ref_type for x in self.parameters if x.property.ref_type]
 
-        return """class "{name}" {{\n{parameter_str}\n.. responses ..\n{response_str}\n}}\n\n{associations}\n""".format(
-            name=self.name,
-            response_str='\n'.join([x.uml for x in self.responses]),
-            parameter_str='\n'.join(parameter_strings),
-            associations='\n'.join({'"{name}" ..> {type}'.format(name=self.name, type=type) for type in references})
-        )
+        if entity_model_only:
+                    return ''
+        else:
+            return """class "{name}" {{\n{parameter_str}\n.. responses ..\n{response_str}\n}}\n\n{associations}\n""".format(
+                name=self.name,
+                response_str='\n'.join([x.uml for x in self.responses]),
+                parameter_str='\n'.join(parameter_strings),
+                associations='\n'.join({'"{name}" ..> {type}'.format(name=self.name, type=type) for type in references})
+            )
 
     @property
     def name(self):
@@ -356,12 +360,15 @@ class Path:
 
     @property
     def uml(self):
-        return 'interface "{path}" {{\n}}\n\n{operation_str}\n{association_str}\n\n'.format(
-            path=self.path,
-            operation_str='\n'.join([op.uml for op in self.operations]),
-            association_str='\n'.join(['"{path}" ..> "{operation_name}"'.format(
-                path=self.path, operation_name=op.name) for op in sorted(self.operations)])
-        )
+        if entity_model_only:
+            return ''
+        else:
+            return 'interface "{path}" {{\n}}\n\n{operation_str}\n{association_str}\n\n'.format(
+                path=self.path,
+                operation_str='\n'.join([op.uml for op in self.operations]),
+                association_str='\n'.join(['"{path}" ..> "{operation_name}"'.format(
+                    path=self.path, operation_name=op.name) for op in sorted(self.operations)])
+            )
 
 
 class Swagger:
@@ -391,8 +398,12 @@ class Swagger:
             definitions='\n\n'.join([d.uml for d in self.definitions])
         )
 
-
 if __name__ == '__main__':
     input_file_name = sys.argv[1]
+    if len(sys.argv) > 2 and "--entity-model-only" == sys.argv[2]:
+        entity_model_only = True
+    else:
+        entity_model_only = False
+
     sw = Swagger.from_file(input_file_name)
     print(sw.uml, end='', flush=True)
